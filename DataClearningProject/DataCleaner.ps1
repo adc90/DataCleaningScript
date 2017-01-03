@@ -2,6 +2,31 @@
 # DataCleaner.ps1
 #
 
+#=============================
+# Scrubbers
+#=============================
+
+function RemoveExtraSpaces ($line) {
+	Write-Host "Testtt"
+	return ($line -replace '\s+',' ').Trim()
+}
+
+function UppercaseWord ($line) {
+	return $line.substring(0,1).toupper() + $line.substring(1).tolower()
+}
+
+function RemoveNumericCharacters($line) {
+	$pattern = '[^a-zA-z]'
+	return $line.Replace($pattern,'')
+}
+
+function RemoveNonNumericCharacters($line) {
+	$pattern = '[a-zA-z]'
+	return $line.Replace($pattern,'')
+}
+#=============================
+
+
 function Write-Heading ($item)
 {
 	$header = "-------------------------"
@@ -39,12 +64,53 @@ function GetHeader {
 	return $header
 }
 
-function RemoveExtraSpaces ($line) {
-	return ($line -replace '\s+',' ').Trim()
+function GetScrubbersMenu {
+	$scrubbers = New-Object System.Collections.Specialized.OrderedDictionary
+	$scrubbers.Add("0: Remove Numeric chars", "Function:RemoveNumericCharacters")
+	$scrubbers.Add("1: Remove extra spaces", "Function:RemoveExtraSpaces")
+	$scrubbers.Add("2: Uppercase Word", "Function:UppercaseWord")
+	$scrubbers.Add("3: Remove Non-numeric chars", "Function:RemoveNonNumericCharacters" )
+
+	return $scrubbers
 }
 
-function UppercaseWord ($line) {
+function GetScrubbers {
+	$arry = @()
+	for() {
+		$input = Read-Host
+		if($input -eq "end") {
+			break
+		} else { 
+			$arry += $input
+		}
+	}	
+	return $arry
+}
 
+function GetScrubberFuncs($values, $menu) {
+	$keys = [string[]] $menu.Keys
+
+	$a = @()
+
+	foreach($i in $values) {
+		$key = $keys[$i] 
+		$a += $menu[$key]
+	}
+	return $a
+}
+
+
+#=============================
+# Process File
+#=============================
+
+function CleanLine($line, $cleanFuncs) {
+	$line = $line.Split(",")
+	#Write-Host $line
+	Write-Host &($cleanFuncs[0]) "A     aa"
+	#foreach($s in $line) {
+	#	
+	#}
 }
 
 function ProcessFile ($directory) {
@@ -54,11 +120,37 @@ function ProcessFile ($directory) {
 		#Avoid using Get-Content since it's a little slower on large files
 		$reader = [System.IO.File]::OpenText($directory)
 		$dir = GetPathFromFile($directory)
-		$dir = "$dir\cleanedData.txt"
+		$dir = "$dir\cleanedData2.txt"
+		if(Test-Path $dir) {
+			Remove-Item $dir
+		}	
 		$writer = [System.IO.File]::AppendText($dir)
 		$header = GetHeader
-		$a = ConvertFrom-Csv $directory -Header $header
-		Write-Host $a
+		
+		$scrubbers = @{}		
+		$scrubbersDict = GetScrubbersMenu
+
+		Write-Host "Select a filter by number, type end to move to the next item"
+		$scrubber = GetScrubbersMenu
+		$keys = [string[]] $scrubber.Keys
+		$keys | foreach { Write-Host $_ }
+
+		foreach($itm in $header) {
+			Write-Heading "Get scrubbers for column: $itm"
+			$sbr = GetScrubbers
+			$scrubbers.Add($itm, $sbr)
+		}
+
+		$processingStack = @{}
+		foreach($itm in $scrubbers) {
+			$values = $itm.Values
+			$funcs = GetScrubberFuncs $values $scrubbersDict
+			Write-Host $itm
+			$processingStack.Add($itm, $functs)
+		}
+
+		$processingStack.Values | foreach { Write-Host $_ }
+
 		try {
 			$txt = ""
 			for() {
@@ -66,8 +158,8 @@ function ProcessFile ($directory) {
 				if($line -eq $null) {
 					break
 				} else {
-					$line = RemoveExtraSpaces($line)
-					$writer.WriteLine($line)
+					CleanLine $line $processingStack
+					#$writer.WriteLine($line)
 				}
 			}
 		} finally {
