@@ -5,10 +5,12 @@
 #=============================
 # Scrubbers
 #=============================
-
 function RemoveExtraSpaces ($line) {
-	Write-Host "Testtt"
 	return ($line -replace '\s+',' ').Trim()
+}
+
+function RemoveSpaces ($line) {
+	return ($line -replace '\s+','').Trim()
 }
 
 function UppercaseWord ($line) {
@@ -66,10 +68,11 @@ function GetHeader {
 
 function GetScrubbersMenu {
 	$scrubbers = New-Object System.Collections.Specialized.OrderedDictionary
-	$scrubbers.Add("0: Remove Numeric chars", "Function:RemoveNumericCharacters")
-	$scrubbers.Add("1: Remove extra spaces", "Function:RemoveExtraSpaces")
-	$scrubbers.Add("2: Uppercase Word", "Function:UppercaseWord")
-	$scrubbers.Add("3: Remove Non-numeric chars", "Function:RemoveNonNumericCharacters" )
+	$scrubbers.Add("0: Remove Numeric chars", (gi function:RemoveNumericCharacters))
+	$scrubbers.Add("1: Remove extra spaces", (gi function:RemoveExtraSpaces))
+	$scrubbers.Add("2: Uppercase Word", (gi function:UppercaseWord))
+	$scrubbers.Add("3: Remove Non-numeric chars", (gi function:RemoveNonNumericCharacters ))
+	$scrubbers.Add("4: Remove all spaces", (gi function:RemoveSpaces ))
 
 	return $scrubbers
 }
@@ -89,13 +92,8 @@ function GetScrubbers {
 
 function GetScrubberFuncs($values, $menu) {
 	$keys = [string[]] $menu.Keys
-
 	$a = @()
-
-	foreach($i in $values) {
-		$key = $keys[$i] 
-		$a += $menu[$key]
-	}
+	$values | foreach { $a += $menu[$keys[$_]] }
 	return $a
 }
 
@@ -104,13 +102,28 @@ function GetScrubberFuncs($values, $menu) {
 # Process File
 #=============================
 
-function CleanLine($line, $cleanFuncs) {
-	$line = $line.Split(",")
-	#Write-Host $line
-	Write-Host &($cleanFuncs[0]) "A     aa"
-	#foreach($s in $line) {
-	#	
-	#}
+function CleanLine($lines, $cleanFuncs) {
+	$line = $lines.toString().Split(",")
+	$i = 0
+	$cleanedLine = @()
+	$line | foreach {
+		$itm = $_
+		if($cleanFuncs.ContainsKey($i))	{
+			try {
+				$cleanFuncs[$i] | foreach {
+					$itm = (& $_($itm))
+					$a = "A"
+				}
+			} catch {
+				$t = $_
+			}
+		}
+		$i++
+		$cleanedLine += $itm
+	}
+
+	return $cleanedLine.Join(",")
+
 }
 
 function ProcessFile ($directory) {
@@ -142,14 +155,13 @@ function ProcessFile ($directory) {
 		}
 
 		$processingStack = @{}
+		$i = 0
 		foreach($itm in $scrubbers) {
 			$values = $itm.Values
 			$funcs = GetScrubberFuncs $values $scrubbersDict
-			Write-Host $itm
-			$processingStack.Add($itm, $functs)
+			$processingStack.Add($i, $funcs)
+			$i++
 		}
-
-		$processingStack.Values | foreach { Write-Host $_ }
 
 		try {
 			$txt = ""
@@ -158,8 +170,8 @@ function ProcessFile ($directory) {
 				if($line -eq $null) {
 					break
 				} else {
-					CleanLine $line $processingStack
-					#$writer.WriteLine($line)
+					$line = CleanLine $line $processingStack
+					$writer.WriteLine($line)
 				}
 			}
 		} finally {
@@ -170,6 +182,14 @@ function ProcessFile ($directory) {
 	}
 }
 
-Write-Heading "Data cleaning utility"
-$dataFile = SetDirectory "Set in input file" "Please enter a valid file"
+#Write-Heading "Data cleaning utility"
+#$dataFile = SetDirectory "Set in input file" "Please enter a valid file"
+$dataFile = "C:\Users\adc90\Desktop\data.txt"
 ProcessFile $dataFile
+
+#$t = @{}
+#$t.Add("a", (gi function:RemoveExtraSpaces))
+#Write-Host (& $t["a"]("A         b"))
+#UppercaseWord
+#RemoveNumericCharacters
+#RemoveNonNumericCharacters
