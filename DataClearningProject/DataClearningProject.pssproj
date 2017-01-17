@@ -28,6 +28,7 @@
   </PropertyGroup>
   <ItemGroup />
   <ItemGroup>
+    <Compile Include="CleanCsv.ps1" />
     <Compile Include="DataCreator.ps1" />
     <Compile Include="DataCleaner.ps1" />
   </ItemGroup>
